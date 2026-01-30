@@ -5,8 +5,7 @@ const deriveWrapKey = async prf =>
         {
             name: "HKDF",
             hash: "SHA-256",
-            salt: PRF_SALT,
-            // salt: new Uint8Array(16),
+            salt: new Uint8Array(16),
             info: enc("wrap-page-key"),
         },
         await crypto.subtle.importKey("raw", prf, "HKDF", false, ["deriveKey"]),
@@ -15,40 +14,44 @@ const deriveWrapKey = async prf =>
         ["encrypt", "decrypt"]
     );
 
-const PRF_SALT = (() => {
-    const s = localStorage.getItem("prfSalt");
-    if (s) return unb64(s);
-
-    const v = crypto.getRandomValues(new Uint8Array(32));
-    localStorage.setItem("prfSalt", b64(v));
-    return v;
-})();
-
 const prfBytesOnce = (() => {
     const cache = { value: null };
 
     return async () => {
         if (cache.value) return cache.value;
 
-        const a = await navigator.credentials.get({
-            publicKey: {
-                challenge: crypto.getRandomValues(new Uint8Array(32)),
-                userVerification: "required",
-                extensions: { prf: { eval: { first: PRF_SALT } } },
-            },
-        });
+        const a = await (async () => {
+            try {
+                return await navigator.credentials.get({
+                    publicKey: {
+                        challenge: crypto.getRandomValues(new Uint8Array(32)),
+                        userVerification: "required",
+                        allowCredentials: [{
+                            type: "public-key",
+                            id: unb64(localStorage.getItem("credId")),
+                            transports: ["internal"],
+                        }],
+                        extensions: { prf: { eval: { first: enc("papaya-wrap-key") } } },
+                    }
+                });
+            } catch (e) {
+                return null
+            }
+        })()
 
-        const prf = a.getClientExtensionResults().prf?.results?.first;
+        
+
+        const prf = a?.getClientExtensionResults().prf?.results?.first;
 
         if (!prf) {
-            await navigator.credentials.create({
+            const cred = await navigator.credentials.create({
                 publicKey: {
                     challenge: crypto.getRandomValues(new Uint8Array(32)),
-                    rp: { name: "Local Protected Media" },
+                    rp: { name: 'Papaya Protected Media' },
                     user: {
                         id: crypto.getRandomValues(new Uint8Array(32)),
-                        name: "totp-user",
-                        displayName: "Totp User"
+                        name: "papaya-user",
+                        displayName: "Papaya User"
                     },
                     pubKeyCredParams: [
                         { type: "public-key", alg: -7 },
@@ -56,11 +59,14 @@ const prfBytesOnce = (() => {
                     ],
                     authenticatorSelection: {
                         authenticatorAttachment: "platform",
-                        userVerification: "required"
+                        userVerification: "required",
+                        residentKey: "required",
                     },
                     extensions: { prf: {} }
                 }
             });
+
+            localStorage.setItem("credId", b64(new Uint8Array(cred.rawId)));
 
             // iOS Safari needs a reload after create
             // location.reload();
