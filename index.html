@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TOTP</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      margin: 2rem;
+      background-color: black;
+      color: white;
+    }
+
+    header {
+      margin-bottom: 1rem;
+    }
+
+    main {
+      max-width: 720px;
+    }
+  </style>
+</head>
+
+<body>
+  <progress id="remainingSeconds" max="30" value="30"></progress>
+  <label for="remainingSeconds" style="margin-left:8px"></label>
+  <main id="codes"></main>
+  <script type="module">
+    import { unwrapKey } from './webauthn.js';
+    import { decrypt } from './decrypt.js';
+    import { dec } from './helpers.js';
+    import { generateTotpCode } from './totp.js';
+
+    const state = {
+      timeStep: 0,
+    }
+
+    const updateCodes = async (secrets, timeStep) => {
+      const codesContainer = document.getElementById('codes')
+      codesContainer.innerHTML = ''
+
+      const codeElementsPromises = secrets.map(async secret => {
+        const codeElement = document.createElement('div')
+        const code = await generateTotpCode(secret.secret, timeStep)
+        codeElement.textContent = `${secret.issuer} : ${secret.login} - ${code}`
+        codeElement.style.position = 'relative'
+        codeElement.style.backgroundColor = '#222'
+        codeElement.style.padding = '1rem'
+        codeElement.style.marginBottom = '1rem'
+        codeElement.style.borderRadius = '5px'
+        codeElement.style.cursor = 'pointer'
+
+
+        codeElement.onclick = () => {
+          navigator.clipboard.writeText(code)
+          const notification = document.createElement('span')
+          notification.textContent = '📋'
+          notification.style.position = 'absolute'
+          notification.style.top = '5px'
+          codeElement.appendChild(notification)
+          setTimeout(() => {
+            codeElement.removeChild(notification)
+          }, 500)
+        }
+
+        return codeElement
+      })
+
+      const codeElements = await Promise.all(codeElementsPromises)
+
+      codesContainer.append(...codeElements)
+    }
+
+    const refreshCounter = (secrets) => {
+      const remainingSecondsElement = document.getElementById('remainingSeconds')
+
+      setInterval(() => {
+        const timeStep = Math.floor(Date.now() / 1000 / 30)
+
+        if (timeStep !== state.timeStep) {
+          state.timeStep = timeStep
+          updateCodes(secrets, timeStep)
+        }
+
+        const remainingSeconds = 30 - Math.floor(Date.now() / 1000) % 30
+        const remainingLabel = document.querySelector('label[for="remainingSeconds"]')
+        remainingLabel.textContent = `${remainingSeconds}`
+        remainingSecondsElement.value = remainingSeconds
+      }, 1000)
+    }
+
+
+    (async () => {
+      const { default: encriptedSecrets } = await import('./secrets.json', { with: { type: "json" } })
+
+      const password = dec(await unwrapKey())
+
+      const secrets = encriptedSecrets.map(async (s) => {
+        const secret = await decrypt(password, s.secret);
+
+        return {
+          issuer: s.issuer,
+          login: s.login,
+          secret
+        };
+      });
+
+      const resolvedSecrets = await Promise.all(secrets);
+      refreshCounter(resolvedSecrets)
+    })()
+  </script>
+</body>
+
+</html>

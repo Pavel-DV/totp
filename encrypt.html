@@ -1,0 +1,53 @@
+<script>
+    (async () => {
+        const enc = s => new TextEncoder().encode(s)
+
+        const password = '#'
+        const plaintext = 'This is a secret message that needs to be encrypted securely.'
+
+        const salt = crypto.getRandomValues(new Uint8Array(16))
+        const iv = crypto.getRandomValues(new Uint8Array(12))
+
+        const baseKey = await crypto.subtle.importKey(
+            'raw',
+            enc(password),
+            'PBKDF2',
+            false,
+            ['deriveKey']
+        )
+
+        const key = await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+            baseKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt']
+        )
+
+        const ciphertext = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            enc(plaintext)
+        )
+
+        console.log({
+            saltArr: Array.from(salt),
+            ivArr: Array.from(iv),
+            ciphertextArr: Array.from(new Uint8Array(ciphertext)),
+            salt,
+            iv,
+            ciphertext,
+        })
+
+        const b64 = b => btoa(String.fromCharCode(...b))
+        const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0))
+
+        const json = {
+            salt: b64(salt),
+            iv: b64(iv),
+            ciphertext: b64(new Uint8Array(ciphertext)),
+        }
+
+        console.log(JSON.stringify(json))
+    })()
+</script>
