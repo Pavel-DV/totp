@@ -87,7 +87,7 @@
         const remainingSeconds = 30 - Math.floor(Date.now() / 1000) % 30
         const remainingLabel = document.querySelector('label[for="remainingSeconds"]')
         remainingLabel.textContent = `${remainingSeconds}`
-        remainingSecondsElement.value = remainingSeconds
+        remainingSecondsElement.value = 30 - remainingSeconds
       }, 1000)
     }
 
