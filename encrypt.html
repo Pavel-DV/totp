@@ -1,12 +1,67 @@
-<script>
-    (async () => {
+<textarea id="input" rows="12" cols="50">
+    {
+    "encriptionPassword": "ggg",
+    "secret": "ggg",
+    "login": "ggg",
+    "password": "ggg",
+    "website": "ggg",
+    "notes": "ggg",
+    "issuer": "ggg",
+    "salt": "ggg",
+    "iv": "ggg"
+    }
+</textarea>
+
+<textarea id="output" rows="12" cols="50">{
+
+}
+</textarea>
+
+<button id="encrypt">Encrypt</button>
+
+<script type="module">
+    import { unb64 } from './helpers.js';
+
+    const encryptButton = document.getElementById('encrypt')
+
+    encryptButton.addEventListener('click', async () => {
+        const input = document.getElementById('input')
+        const output = document.getElementById('output')
+
+        const inputData = JSON.parse(input.value)
+        const encriptionPassword = inputData.encriptionPassword
+
+        const salt = inputData.salt === '' ? crypto.getRandomValues(new Uint8Array(16)) : unb64(inputData.salt)
+        const iv = inputData.iv === '' ? crypto.getRandomValues(new Uint8Array(12)) : unb64(inputData.iv)
+
+        const secret = await encode({ plaintext: inputData.secret, password: encriptionPassword, salt, iv })
+        const login = await encode({ plaintext: inputData.login, password: encriptionPassword, salt, iv })
+        const password = await encode({ plaintext: inputData.password, password: encriptionPassword, salt, iv })
+        const website = await encode({ plaintext: inputData.website, password: encriptionPassword, salt, iv })
+        const notes = await encode({ plaintext: inputData.notes, password: encriptionPassword, salt, iv })
+
+        const json = {
+            issuer: inputData.issuer,
+            salt: b64(salt),
+            iv: b64(iv),
+            secret: b64(new Uint8Array(secret)),
+            login: b64(new Uint8Array(login)),
+            password: b64(new Uint8Array(password)),
+            website: b64(new Uint8Array(website)),
+            notes: b64(new Uint8Array(notes)),
+        }
+
+        output.value = JSON.stringify(json, null, 2)
+    })
+
+    const b64 = b => btoa(String.fromCharCode(...b))
+
+    const encode = async ({ plaintext, password, salt, iv }) => {
+        if (!plaintext) {
+            return ''
+        }
+
         const enc = s => new TextEncoder().encode(s)
-
-        const password = '#'
-        const plaintext = 'This is a secret message that needs to be encrypted securely.'
-
-        const salt = crypto.getRandomValues(new Uint8Array(16))
-        const iv = crypto.getRandomValues(new Uint8Array(12))
 
         const baseKey = await crypto.subtle.importKey(
             'raw',
@@ -39,7 +94,6 @@
             ciphertext,
         })
 
-        const b64 = b => btoa(String.fromCharCode(...b))
         const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0))
 
         const json = {
@@ -49,5 +103,7 @@
         }
 
         console.log(JSON.stringify(json))
-    })()
+
+        return ciphertext
+    }
 </script>

@@ -44,14 +44,17 @@
       const codeElementsPromises = secrets.map(async secret => {
         const codeElement = document.createElement('div')
         const code = await generateTotpCode(secret.secret, timeStep)
-        codeElement.textContent = `${secret.issuer} : ${secret.login} - ${code}`
-        codeElement.style.position = 'relative'
-        codeElement.style.backgroundColor = '#222'
-        codeElement.style.padding = '1rem'
-        codeElement.style.marginBottom = '1rem'
-        codeElement.style.borderRadius = '5px'
-        codeElement.style.cursor = 'pointer'
+        const formattedCode = code.match(/.{1,3}/g).join('<span style="margin: 0 2px"></span>')
+        codeElement.innerHTML = `${secret.issuer} : ${secret.login} - <span style="color: #999">${formattedCode}</span>`
 
+        Object.assign(codeElement.style, {
+          position: 'relative',
+          backgroundColor: '#222',
+          padding: '1rem',
+          marginBottom: '1rem',
+          borderRadius: '5px',
+          cursor: 'pointer',
+        })
 
         codeElement.onclick = () => {
           navigator.clipboard.writeText(code)
@@ -60,6 +63,7 @@
           notification.style.position = 'absolute'
           notification.style.top = '5px'
           codeElement.appendChild(notification)
+
           setTimeout(() => {
             codeElement.removeChild(notification)
           }, 500)
@@ -95,15 +99,25 @@
     (async () => {
       const { default: encriptedSecrets } = await import('./secrets.json', { with: { type: "json" } })
 
-      const password = dec(await unwrapKey())
+      const encPassword = dec(await unwrapKey())
+      const salt = encriptedSecrets.salt
 
-      const secrets = encriptedSecrets.map(async (s) => {
-        const secret = await decrypt(password, s.secret);
+      const secrets = encriptedSecrets.credentials.map(async (s) => {
+        const issuer = await decrypt(encPassword, { salt, ...s.issuer });
+        const secret = await decrypt(encPassword, { salt, ...s.secret });
+        const login = await decrypt(encPassword, { salt, ...s.login });
+        const password = await decrypt(encPassword, { salt, ...s.password });
+        const website = await decrypt(encPassword, { salt, ...s.website });
+        const notes = await decrypt(encPassword, { salt, ...s.notes });
 
         return {
-          issuer: s.issuer,
-          login: s.login,
-          secret
+          issuer,
+          login,
+          secret,
+          password,
+          website,
+          notes,
+          salt,
         };
       });
 

@@ -1,6 +1,8 @@
 import { enc, dec, unb64 } from './helpers.js';
 
 export async function decrypt(password, secret) {
+    if (!!secret.plaintext) return secret.plaintext
+    if (!secret.ciphertext) return ''
 
     const salt = unb64(secret.salt)
     const iv = unb64(secret.iv)
@@ -22,6 +24,8 @@ export async function decrypt(password, secret) {
         ['decrypt']
     )
 
+    console.log(secret.iv)
+    
     const plainBuf = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv },
         key,
