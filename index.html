@@ -41,18 +41,21 @@
       const codesContainer = document.getElementById('codes')
       codesContainer.innerHTML = ''
 
-      const codeElementsPromises = secrets.map(async secret => {
-        const codeElement = document.createElement('div')
+      const tokenElementsPromises = secrets.map(async secret => {
+        const tokenElement = document.createElement('div')
+        tokenElement.innerHTML = `${secret.issuer} : ${secret.login}`
+
+        const codeElement = document.createElement('span')
+        tokenElement.appendChild(codeElement)
         const code = await generateTotpCode(secret.secret, timeStep)
         const formattedCode = code.match(/.{1,3}/g).join('<span style="margin: 0 2px"></span>')
-        codeElement.innerHTML = `${secret.issuer} : ${secret.login} - <span style="color: #999">${formattedCode}</span>`
+        codeElement.innerHTML = formattedCode
+        codeElement.style.color = '#999'
 
         Object.assign(codeElement.style, {
-          position: 'relative',
-          backgroundColor: '#222',
+          color: '#999',
+          fontSize: '1.5rem',
           padding: '1rem',
-          marginBottom: '1rem',
-          borderRadius: '5px',
           cursor: 'pointer',
         })
 
@@ -69,12 +72,43 @@
           }, 500)
         }
 
-        return codeElement
+        const urlElement = document.createElement('a')
+        tokenElement.appendChild(urlElement)
+        urlElement.textContent = 'Add to Auth app 🔗'
+
+        const url = new URL('otpauth://totp')
+        url.pathname = `${secret.issuer}:${secret.login}`
+
+        const params = [
+          { name: 'issuer', value: secret.issuer },
+          { name: 'secret', value: secret.secret },
+          { name: 'password', value: secret.password },
+          { name: 'website', value: secret.website },
+          { name: 'notes', value: secret.notes },
+          { name: 'salt', value: secret.salt },
+          { name: 'algorithm', value: 'SHA1' },
+          { name: 'digits', value: '6' },
+          { name: 'period', value: '30' },
+        ]
+
+        const nonEmptyParams = params.filter(p => p.value && p.value !== '')
+        nonEmptyParams.forEach(p => url.searchParams.set(p.name, p.value))
+        urlElement.href = url.href
+
+        Object.assign(tokenElement.style, {
+          position: 'relative',
+          backgroundColor: '#222',
+          padding: '1rem',
+          marginBottom: '1rem',
+          borderRadius: '5px',
+        })
+
+        return tokenElement
       })
 
-      const codeElements = await Promise.all(codeElementsPromises)
+      const tokenElements = await Promise.all(tokenElementsPromises)
 
-      codesContainer.append(...codeElements)
+      codesContainer.append(...tokenElements)
     }
 
     const refreshCounter = (secrets) => {

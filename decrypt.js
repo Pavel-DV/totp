@@ -24,8 +24,6 @@ export async function decrypt(password, secret) {
         ['decrypt']
     )
 
-    console.log(secret.iv)
-    
     const plainBuf = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv },
         key,

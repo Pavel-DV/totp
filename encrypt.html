@@ -1,15 +1,5 @@
 <textarea id="input" rows="12" cols="50">
-    {
-    "encriptionPassword": "ggg",
-    "secret": "ggg",
-    "login": "ggg",
-    "password": "ggg",
-    "website": "ggg",
-    "notes": "ggg",
-    "issuer": "ggg",
-    "salt": "ggg",
-    "iv": "ggg"
-    }
+
 </textarea>
 
 <textarea id="output" rows="12" cols="50">{
@@ -20,9 +10,51 @@
 <button id="encrypt">Encrypt</button>
 
 <script type="module">
-    import { unb64 } from './helpers.js';
+    import { b64, unb64 } from './helpers.js';
+    import { unwrapKey } from './webauthn.js';
+    import { dec } from './helpers.js';
 
     const encryptButton = document.getElementById('encrypt')
+    const encriptionPassword = dec(await unwrapKey())
+    const { default: encriptedSecrets } = await import('./secrets.json', { with: { type: "json" } })
+    const salt = encriptedSecrets.salt
+
+    const inputData = {
+        encriptionPassword,
+        salt,
+        plaintext: 'ggg',
+        iv: ''
+    }
+
+    input.value = JSON.stringify(inputData, null, 2)
+
+    const getCleanIv = () => {
+        const emptyArr = new Uint8Array(12)
+        while (true) {
+            const iv = crypto.getRandomValues(emptyArr)
+            const strIv = b64(iv)
+
+            if (!/[^\w]/.test(strIv)) {
+                return iv
+            }
+        }
+    }
+
+    const cleanEncode = async ({ plaintext, password, salt, iv }) => {
+        if (iv !== '') {
+            return { iv, ciphertext: await encode({ plaintext, password, salt, iv: unb64(iv) }) }
+        }
+
+        while (true) {
+            const iv = getCleanIv()
+            const ciphertext = await encode({ plaintext, password, salt, iv })
+            const strCiphertext = b64(new Uint8Array(ciphertext))
+
+            if (!/[^\w]/.test(strCiphertext)) {
+                return { iv, ciphertext }
+            }
+        }
+    }
 
     encryptButton.addEventListener('click', async () => {
         const input = document.getElementById('input')
@@ -32,29 +64,18 @@
         const encriptionPassword = inputData.encriptionPassword
 
         const salt = inputData.salt === '' ? crypto.getRandomValues(new Uint8Array(16)) : unb64(inputData.salt)
-        const iv = inputData.iv === '' ? crypto.getRandomValues(new Uint8Array(12)) : unb64(inputData.iv)
 
-        const secret = await encode({ plaintext: inputData.secret, password: encriptionPassword, salt, iv })
-        const login = await encode({ plaintext: inputData.login, password: encriptionPassword, salt, iv })
-        const password = await encode({ plaintext: inputData.password, password: encriptionPassword, salt, iv })
-        const website = await encode({ plaintext: inputData.website, password: encriptionPassword, salt, iv })
-        const notes = await encode({ plaintext: inputData.notes, password: encriptionPassword, salt, iv })
+        const { iv, ciphertext } = await cleanEncode({ plaintext: inputData.plaintext, password: encriptionPassword, salt, iv: inputData.iv })
 
         const json = {
             issuer: inputData.issuer,
             salt: b64(salt),
             iv: b64(iv),
-            secret: b64(new Uint8Array(secret)),
-            login: b64(new Uint8Array(login)),
-            password: b64(new Uint8Array(password)),
-            website: b64(new Uint8Array(website)),
-            notes: b64(new Uint8Array(notes)),
+            ciphertext: b64(new Uint8Array(ciphertext)),
         }
 
         output.value = JSON.stringify(json, null, 2)
     })
-
-    const b64 = b => btoa(String.fromCharCode(...b))
 
     const encode = async ({ plaintext, password, salt, iv }) => {
         if (!plaintext) {
@@ -84,17 +105,6 @@
             key,
             enc(plaintext)
         )
-
-        console.log({
-            saltArr: Array.from(salt),
-            ivArr: Array.from(iv),
-            ciphertextArr: Array.from(new Uint8Array(ciphertext)),
-            salt,
-            iv,
-            ciphertext,
-        })
-
-        const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0))
 
         const json = {
             salt: b64(salt),
