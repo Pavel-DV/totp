@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/qrious/dist/qrious.min.js"></script>
   <title>TOTP</title>
   <style>
     body {
@@ -27,6 +28,10 @@
   <progress id="remainingSeconds" max="30" value="30"></progress>
   <label for="remainingSeconds" style="margin-left:8px"></label>
   <main id="codes"></main>
+  <canvas id="qr" style="
+    position: fixed;
+    top: 36px;
+  "></canvas>
   <script type="module">
     import { unwrapKey } from './webauthn.js';
     import { decrypt } from './decrypt.js';
@@ -43,7 +48,7 @@
 
       const tokenElementsPromises = secrets.map(async secret => {
         const tokenElement = document.createElement('div')
-        tokenElement.innerHTML = `${secret.issuer} : ${secret.login}`
+        tokenElement.innerHTML = `${secret.issuer} : ${secret.login}&#8203;`
 
         const codeElement = document.createElement('span')
         tokenElement.appendChild(codeElement)
@@ -57,6 +62,7 @@
           fontSize: '1.5rem',
           padding: '1rem',
           cursor: 'pointer',
+          position: 'relative',
         })
 
         codeElement.onclick = () => {
@@ -73,8 +79,11 @@
         }
 
         const urlElement = document.createElement('a')
+        tokenElement.append('\u200B')
         tokenElement.appendChild(urlElement)
         urlElement.textContent = 'Add to Auth app 🔗'
+        urlElement.style.display = 'inline-block';
+        urlElement.style.textDecoration = 'none';
 
         const url = new URL('otpauth://totp')
         url.pathname = `${secret.issuer}:${secret.login}`
@@ -95,8 +104,31 @@
         nonEmptyParams.forEach(p => url.searchParams.set(p.name, p.value))
         urlElement.href = url.href
 
+        const qrButton = document.createElement('span')
+        qrButton.textContent = 'QR-code ▦'
+        qrButton.style.padding = '8px'
+        qrButton.style.color = 'burlywood'
+        qrButton.style.cursor = 'pointer'
+
+        const qrElement = document.getElementById('qr')
+
+        qrElement.onclick = () => {
+          qrElement.style.display = 'none'
+        }
+
+        qrButton.onclick = () => {
+          const qr = new QRious({
+            element: qrElement,
+            value: url.href,
+            size: 300,
+          })
+
+          qrElement.style.display = 'block'
+        }
+
+        tokenElement.appendChild(qrButton)
+
         Object.assign(tokenElement.style, {
-          position: 'relative',
           backgroundColor: '#222',
           padding: '1rem',
           marginBottom: '1rem',
