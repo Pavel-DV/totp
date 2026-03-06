@@ -111,6 +111,19 @@ export async function unwrapKey() {
     const iv = unb64(ivB64);
     const data = unb64(dataB64);
 
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
-    return new Uint8Array(plain);
+    try {
+        const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+        return new Uint8Array(plain);
+    } catch (e) {
+        // Wrapped key is stale/corrupted or bound to a different credential.
+        localStorage.removeItem("wrappedKeyIv");
+        localStorage.removeItem("wrappedKeyData");
+
+        const password = prompt("Password");
+        if (!password) throw e;
+
+        const raw = enc(password);
+        await wrapKey(raw);
+        return raw;
+    }
 }
