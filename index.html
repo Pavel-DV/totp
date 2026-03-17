@@ -166,7 +166,7 @@
       const { default: encriptedSecrets } = await import('./secrets.json', { with: { type: "json" } })
 
       if (!document.hasFocus()) {
-        document.body.innerHTML = '<p style="color: red; font-size: 1.5rem">Please focus the window</p>'
+        document.body.innerHTML += '<p style="color: red; font-size: 1.5rem">Please focus the window</p>'
         await new Promise(resolve => {
           window.addEventListener('focus', resolve, { once: true })
         })
